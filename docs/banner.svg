@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#1e293b"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="300" rx="18" fill="url(#bg)"/>
+
+  <text x="60" y="110" font-family="Menlo, Consolas, monospace" font-size="52" font-weight="700" fill="#f8fafc">local-llm-arena</text>
+  <text x="60" y="150" font-family="Menlo, Consolas, monospace" font-size="22" fill="#94a3b8">benchmark harness · modelos locales vs. API · baseline configurable</text>
+
+  <!-- three bars representing suites: dev / agentic / perf, local (teal) vs baseline (amber) -->
+  <g font-family="Menlo, Consolas, monospace" font-size="16" fill="#cbd5e1">
+    <!-- dev -->
+    <text x="60" y="200">dev</text>
+    <rect x="60" y="212" width="230" height="14" rx="4" fill="#334155"/>
+    <rect x="60" y="212" width="190" height="14" rx="4" fill="#2dd4bf"/>
+    <rect x="222" y="209" width="3" height="20" fill="#f59e0b"/>
+
+    <!-- agentic -->
+    <text x="440" y="200">agentic</text>
+    <rect x="440" y="212" width="230" height="14" rx="4" fill="#334155"/>
+    <rect x="440" y="212" width="170" height="14" rx="4" fill="#2dd4bf"/>
+    <rect x="592" y="209" width="3" height="20" fill="#f59e0b"/>
+
+    <!-- perf -->
+    <text x="820" y="200">perf</text>
+    <rect x="820" y="212" width="230" height="14" rx="4" fill="#334155"/>
+    <rect x="820" y="212" width="215" height="14" rx="4" fill="#2dd4bf"/>
+    <rect x="972" y="209" width="3" height="20" fill="#f59e0b"/>
+  </g>
+
+  <g font-family="Menlo, Consolas, monospace" font-size="14" fill="#64748b">
+    <circle cx="66" cy="250" r="5" fill="#2dd4bf"/>
+    <text x="80" y="255">modelo bajo prueba</text>
+    <circle cx="260" cy="250" r="5" fill="#f59e0b"/>
+    <text x="274" y="255">baseline elegido por ti</text>
+  </g>
+</svg>

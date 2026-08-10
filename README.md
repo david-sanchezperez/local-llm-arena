@@ -1,5 +1,7 @@
 # local-llm-arena
 
+![local-llm-arena](docs/banner.svg)
+
 Harness para comparar LLMs — locales (llama.cpp, cualquier servidor
 OpenAI-compatible) o de pago vía API — en varios ejes: código, tool-use/agente,
 rendimiento, y (opcional) SWE-bench Lite real. Local y API comparten la misma

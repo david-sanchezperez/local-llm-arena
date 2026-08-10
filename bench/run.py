@@ -36,12 +36,30 @@ SUITES = {
         "official": True,
         "needs": "venv separado con swebench+datasets (ver README), y solo evalua modelos locales por ahora",
     },
+    "humaneval": {
+        "script": "humaneval_eval.py",
+        "categories": ["dev", "short"],
+        "official": True,
+        "needs": "pip install -r requirements-official.txt",
+    },
+    "gsm8k": {
+        "script": "gsm8k_eval.py",
+        "categories": ["reasoning", "short"],
+        "official": True,
+        "needs": "pip install -r requirements-official.txt",
+    },
+    "mmlu": {
+        "script": "mmlu_eval.py",
+        "categories": ["knowledge", "short"],
+        "official": True,
+        "needs": "pip install -r requirements-official.txt",
+    },
 }
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--suites", help=f"lista separada por comas de {{{','.join(SUITES)}}} (por defecto: todas menos swebench)")
+    ap.add_argument("--suites", help=f"lista separada por comas de {{{','.join(SUITES)}}} (por defecto: todas las baterias propias, no las oficiales)")
     ap.add_argument("--categories", help="filtra baterias por categoria (dev, agentic, perf, tool-use, short, long)")
     ap.add_argument("--baseline", default=None, help="id de modelo baseline para el leaderboard final")
     ap.add_argument("--list", action="store_true", help="lista las baterias disponibles con su categoria y sale")
@@ -59,7 +77,7 @@ def main():
         wanted = {c.strip() for c in args.categories.split(",")}
         names = [n for n, s in SUITES.items() if wanted & set(s["categories"])]
     else:
-        names = [n for n in SUITES if n != "swebench"]  # swebench necesita venv aparte, no por defecto
+        names = [n for n, s in SUITES.items() if not s["official"]]  # las oficiales necesitan datasets/venv extra, no por defecto
 
     for name in names:
         suite = SUITES.get(name)

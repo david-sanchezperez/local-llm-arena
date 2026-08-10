@@ -1,5 +1,6 @@
 """Cliente mínimo OpenAI-compatible + carga de roster. Sin dependencias nuevas."""
 import os
+import re
 import time
 import yaml
 import requests
@@ -34,3 +35,23 @@ def is_alive(model, timeout=5):
         return r.ok
     except requests.RequestException:
         return False
+
+
+def load_hf_dataset(*args, **kwargs):
+    """datasets.load_dataset(), con mensaje claro si falta la dependencia opcional."""
+    try:
+        from datasets import load_dataset
+    except ImportError:
+        raise SystemExit(
+            "Falta el paquete 'datasets' (solo lo necesitan las baterias oficiales "
+            "humaneval/gsm8k/mmlu). Instala con: pip install -r requirements-official.txt"
+        )
+    return load_dataset(*args, **kwargs)
+
+
+def extract_code(text):
+    m = re.search(r"```(?:python)?\n(.*?)```", text, re.DOTALL)
+    if m:
+        return m.group(1)
+    m = re.search(r"```(?:python)?\n(.*)", text, re.DOTALL)  # bloque sin cerrar (truncado)
+    return m.group(1) if m else text

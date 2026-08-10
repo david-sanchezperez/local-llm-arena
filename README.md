@@ -4,23 +4,31 @@
 
 Harness para comparar LLMs — locales (llama.cpp, cualquier servidor
 OpenAI-compatible) o de pago vía API — en varios ejes: código, tool-use/agente,
-rendimiento, y (opcional) SWE-bench Lite real. Local y API comparten la misma
-interfaz OpenAI-compatible, así que el harness no distingue entre ambos: un
-modelo local puede compararse contra el último frontera, o contra un modelo
-barato tipo Haiku/DeepSeek-Flash si eso es lo relevante para tu caso.
+rendimiento, razonamiento y conocimiento. Incluye tests propios (rápidos) y
+benchmarks públicos estándar (HumanEval, GSM8K, MMLU, SWE-bench Lite) con
+datasets reales, no reimplementados. Local y API comparten la misma interfaz
+OpenAI-compatible, así que el harness no distingue entre ambos: un modelo
+local puede compararse contra el último frontera, o contra un modelo barato
+tipo Haiku/DeepSeek-Flash si eso es lo relevante para tu caso.
 
 ## Quick start
 
 ```bash
 cp config/models.yaml.example config/models.yaml   # edita con tus modelos/endpoints
+pip install -r requirements.txt
 cd bench
 python3 run.py --list                 # ver baterias disponibles y categorias
-python3 run.py                        # lanza perf + code + agent, genera results/leaderboard.md
+python3 run.py                        # lanza perf + code + agent (baterias propias), genera results/leaderboard.md
 python3 run.py --baseline glm-5.2     # compara "code pass" contra ese modelo en vez del primero
 python3 run.py --suites code,agent    # solo esas baterias
 python3 run.py --categories dev       # todas las baterias etiquetadas "dev"
 
-# SWE-bench Lite (bateria "oficial", solo modelos locales, requiere venv aparte):
+# Baterias oficiales (HumanEval, GSM8K, MMLU) -- datasets reales via HF, dependencia extra:
+pip install -r ../requirements-official.txt
+python3 run.py --suites humaneval,gsm8k,mmlu
+python3 gsm8k_eval.py --n 300         # cada bateria oficial admite --n para elegir tamano de muestra
+
+# SWE-bench Lite (bateria oficial mas pesada, solo modelos locales, venv aparte):
 cd .. && python3 -m venv .venv && .venv/bin/pip install swebench datasets pyyaml requests
 .venv/bin/python bench/swebench_agent.py <model_id>
 ```
@@ -37,11 +45,18 @@ responde (`is_alive`).
 | `perf` | `perf.py` | perf, short | propio | TTFT y tok/s via streaming |
 | `code` | `code_eval.py` | dev, short | propio | 30 problemas estilo HumanEval, prompt -> exec -> assert |
 | `agent` | `agent_eval.py` | agentic, tool-use, short | propio | 6 tareas multi-turno con tool-use real sobre un sandbox con estado |
+| `humaneval` | `humaneval_eval.py` | dev, short | **oficial** | HumanEval real (164 problemas, pass@1), el benchmark de código más citado |
+| `gsm8k` | `gsm8k_eval.py` | reasoning, short | **oficial** | GSM8K real (razonamiento matemático), submuestra de 100 por defecto (`--n`) |
+| `mmlu` | `mmlu_eval.py` | knowledge, short | **oficial** | MMLU real (57 materias, opción múltiple), submuestra de 200 por defecto (`--n`) |
 | `swebench` | `swebench_agent.py` | dev, agentic, long | **oficial** | SWE-bench Lite real (Docker, harness oficial `swebench`) |
 
-"oficial" = benchmark público/estándar, comparable con resultados de otros
-proyectos (útil al liberar un modelo o producto). "propio" = tests definidos
-en este repo, más rápidos de correr pero solo comparables entre sí.
+"oficial" = benchmark público/estándar con dataset real (vía HF `datasets`),
+comparable con resultados de otros proyectos (útil al liberar un modelo o
+producto). "propio" = tests definidos en este repo, más rápidos de correr
+pero solo comparables entre sí. Las baterías oficiales no se lanzan con
+`run.py` sin argumentos (necesitan `requirements-official.txt` o, en el caso
+de swebench, un venv aparte) — hay que pedirlas explícitamente con
+`--suites`/`--categories`.
 
 ### Añadir otra batería (propia o benchmark público)
 
@@ -50,18 +65,19 @@ Cada batería es un script independiente en `bench/` que: carga modelos con
 `{model_id: {...métricas...}}`. Para añadir una nueva:
 
 1. Escribe el script siguiendo ese contrato (mira `code_eval.py` para una
-   batería simple, o `swebench_agent.py` para una que envuelve un benchmark
-   público externo).
+   batería simple, `humaneval_eval.py`/`gsm8k_eval.py`/`mmlu_eval.py` para
+   una que carga un dataset público real vía `common.load_hf_dataset()`, o
+   `swebench_agent.py` para una que además necesita ejecución/Docker).
 2. Regístrala en `SUITES` dentro de `bench/run.py` (script, categorías,
    `official: True/False`, y `needs` si requiere dependencias extra).
-3. Si quieres que aparezca en `leaderboard.py`, añade sus columnas ahí (hoy
-   soporta perf/code/agent; swebench se reporta aparte por ahora, ver bateria
-   4 más abajo).
+3. Si el resultado es un simple pass/total (como humaneval/gsm8k/mmlu),
+   `leaderboard.py` lo recoge automáticamente por convención de nombre
+   (`results/<suite>_eval.json`); si no, añade sus columnas a mano ahí.
 
-Ejemplos de benchmarks públicos que encajarían con este mismo patrón:
-BFCL (tool-use), LiveCodeBench (código con fecha de corte), MMLU-Pro
-(conocimiento general) — ninguno está integrado todavía, se deja como
-siguiente paso natural una vez haya interés real en compararse contra ellos.
+Benchmarks públicos que encajarían con este mismo patrón y no están
+integrados todavía: BFCL (tool-use con grading AST, más complejo que
+pass/total), LiveCodeBench (código con fecha de corte, evita contaminación).
+Se dejan fuera hasta que haya interés real en compararse contra ellos.
 
 ## Resultado actual
 
@@ -227,10 +243,11 @@ local aguanta el tool-use encadenado casi igual que los frontier.
 
 ## Qué falta (deliberadamente fuera del scope inicial)
 
-- **BFCL / PawBench / tarea propia sobre el tablero de granja-agentes**:
-  la bateria de agente actual es un sandbox propio de 6 tareas, no estos
-  benchmarks publicos — utiles si quieres comparar contra el resto del
-  mundo, no solo entre tus 4 modelos.
+- **BFCL**: benchmark publico de tool-use, no integrado — a diferencia de
+  humaneval/gsm8k/mmlu (pass/total simple), su grading real es contra un AST
+  de la llamada a funcion esperada, mas trabajo que un pass/total. La bateria
+  `agent` actual (sandbox propio de 6 tareas) cubre tool-use pero no es
+  comparable con el resto del mundo.
 - **SWE-bench con modelos de pago**: solo se corrio con el modelo local
   (lo pedido). Correr tambien con claude-sonnet-5/deepseek-v4-flash/glm-5.2
   daria el punto de comparacion real en la tarea donde mas importa —
@@ -249,8 +266,11 @@ local aguanta el tool-use encadenado casi igual que los frontier.
 
 - `bench/common.py`: cliente HTTP mínimo (requests) contra cualquier
   endpoint OpenAI-compatible. Sin SDK — no hace falta.
-- `bench/problems.py`: 8 problemas propios estilo HumanEval, en vez de la
-  librería `human-eval` (no instalada, evita una dependencia nueva).
+- `bench/problems.py`: 30 problemas propios estilo HumanEval (bateria `code`,
+  rápida). Para el HumanEval real (bateria `humaneval`) se usa el dataset
+  oficial vía `datasets` (`common.load_hf_dataset`), no una reimplementación.
+- `bench/run.py`: registro único de baterías (`SUITES`) con categoría y flag
+  oficial/propio; orquesta los scripts sin reescribir su lógica.
 - Ejecución de código generado por el modelo: `subprocess` local sin
   sandbox — vale para modelos de confianza en tu propia máquina; si algún
   día evalúas modelos no confiables, mete Docker.

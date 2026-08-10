@@ -6,7 +6,6 @@ modelos de confianza en tu propia maquina; si algun dia evaluas output no
 confiable, mete un contenedor. No hace falta hoy.
 """
 import json
-import re
 import subprocess
 import sys
 import tempfile
@@ -15,18 +14,10 @@ from pathlib import Path
 
 RESULTS = Path(__file__).parent.parent / "results"
 
-from common import load_models, chat, is_alive
+from common import load_models, chat, is_alive, extract_code
 from problems import PROBLEMS
 
 TIMEOUT_S = 10
-
-
-def extract_code(text):
-    m = re.search(r"```(?:python)?\n(.*?)```", text, re.DOTALL)
-    if m:
-        return m.group(1)
-    m = re.search(r"```(?:python)?\n(.*)", text, re.DOTALL)  # bloque sin cerrar (truncado)
-    return m.group(1) if m else text
 
 
 def run_problem(model, problem):

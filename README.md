@@ -213,6 +213,74 @@ Nota: `litellm_config.yaml` sigue anunciando el modelo como
 realmente sirve `:8080`) — funciona igual, pero el nombre ha quedado
 desactualizado si algun dia quieres renombrarlo por claridad.
 
+### Bateria 5: bake-off de 5 candidatos a MAKER_MODEL en agent-loops (2026-08-10/11)
+
+`agent-loops` (orquestador multi-agente que usa este mismo LLM local como
+"maker" para implementar tareas reales, ver repo `agent-loops`) se quedo sin
+saldo en `glm-5.2` (~$60/mes solo en el rol maker). Se evaluaron 5 modelos
+locales candidatos a sustituirlo, todos vía `scripts/candidate_bench.py`
+(sirve cada uno temporalmente en `:8081`, para producción -- `:8080` -- el
+tiempo del benchmark, y restaura sola al terminar):
+
+| modelo | code (30) | agent (6) | ttft (s) | tok/s |
+|---|---|---|---|---|
+| **Devstral-Small-2-24B** (Q4_K_M) | 30/30 | **6/6** (4.5 turnos) | 0.045 | 58.0 |
+| Muse-Glimmer-30B (UD-Q4_K_XL) | 30/30 | 5/6 (4.8 turnos) | 0.21 | 52.1 |
+| Qwen2.5-Coder-32B-Instruct (Q4_K_M) | 30/30 | 2/6* (2.8 turnos) | 0.08 | 41.7 |
+| GLM-4-32B-0414 (Q4_K_M) | 30/30 | 0/6* | 0.055 | 41.1 |
+| DeepSeek-Coder-V2-Lite-Instruct (Q4_K_M) | 30/30 | 0/6* (2 tool errors) | 0.108 | **118.3** |
+| *(referencia)* glm-5.2 (API, antes de agotar saldo) | 30/30 | 5/6 (3.7 turnos) | 4.0 | 119.0 |
+
+\* `llama-server` con `--jinja` no trae parser de tool-calls para las
+plantillas de GLM-4/Qwen2.5-Coder/DeepSeek-Coder-V2 — el modelo llama a la
+tool bien pero el texto queda crudo en `content` en vez de estructurado.
+Se anadio un parser de fallback en `bench/common.py`
+(`parse_fallback_tool_calls`, 3 formatos reconocidos) que mejoro
+Qwen2.5-Coder de 0/6 a 2/6; GLM-4 y DeepSeek-Coder-Lite siguen en 0/6
+incluso con el fallback activo (`fallback_parser_used` en el JSON confirma
+que sí se reconoce la llamada) — hacen 1-3 tool calls cuando la tarea
+necesita encadenar mas, es un limite genuino de esos dos completando
+tareas multi-paso en esta cuantizacion, no del harness.
+
+**Ganador: Devstral** — iguala o supera a glm-5.2 (referencia de pago) en
+code y agent, gratis y con TTFT ~90x mejor por ser local. Se probo tambien
+`UD-Q6_K_XL` (quant mas alta, 20.8GB) esperando una mejora estricta como
+paso con Qwen3.6 (TQ3→IQ4_XS) — **al reves esta vez**: sin margen de VRAM
+(23.1/24.5GB usados) el rendimiento se desploma (ttft 0.045s→0.331s, code
+30/30→24/30 por probable truncado bajo presion de memoria). Con quants
+grandes, comprobar margen de VRAM antes de asumir "mas bits = mejor".
+
+**Aplicado (2026-08-11)**: `llama-server.service` migrado de Qwen3.6-35B a
+`Devstral-Small-2-24B-Instruct-2512-Q4_K_M`. Alias LiteLLM: `devstral`
+(sustituye a `qwen3`/`Qwen3.6-35B-A3B-TQ3_4S`, retirados). `MAKER_MODEL` en
+`agent-loops/.env` actualizado. Backup del unit anterior en
+`llama-server.service.bak-qwen3.6-iq4xs`.
+
+### Bateria 6: caché KV cuantizada (mismo Devstral, mas contexto)
+
+Con Devstral en Q4_K_M (14.3GB) sobra VRAM frente al limite que dio
+problemas en la bateria 5 (~10GB libres a 8K de contexto). Con caché KV en
+`f16` (por defecto) eso solo da para ~32K de contexto util antes de
+acercarse al mismo problema de margen. Probado `-ctk q8_0 -ctv q8_0`
+(caché a 8 bits en vez de 16) a `-c 65536` (el doble):
+
+| config | code (30) | agent (6) | ttft (s) | tok/s | VRAM |
+|---|---|---|---|---|---|
+| f16 KV, ctx=32768 (anterior) | 30/30 | 6/6 (4.5 turnos) | 0.045 | 58.0 | 21.1GB |
+| q8_0 KV, ctx=65536 (nuevo) | 30/30 | 6/6 (4.0 turnos) | 0.061 | 52.7 | 21.6GB |
+
+Mismo margen de VRAM, el doble de contexto, calidad identica (30/30, 6/6),
+~9% menos tok/s (coste esperado por el des/cuantizado de la cache en cada
+paso) — trade-off razonable dado que las tareas de `agent-loops` pueden
+necesitar specs largas. **Aplicado en produccion** (`llama-server.service`).
+
+Efecto colateral detectado y corregido: al reiniciar LiteLLM (proceso suelto,
+sin systemd) para el cambio de alias de la bateria 5, perdio las variables
+de entorno (`GLM_API_KEY`/`ANTHROPIC_API_KEY`/`DEEPSEEK_API_KEY`) que traía
+de la sesión original -- las tres APIs devolvían 401 hasta relanzarlo
+cargando `~/.config/litellm.env` explicitamente. Pendiente: darle a LiteLLM
+un unit de systemd con `EnvironmentFile=` para que esto no vuelva a pasar.
+
 ### Bateria 2: agente / tool-use (6 tareas, multi-turno)
 
 6 tareas sobre un sandbox de sistema de archivos virtual con estado real

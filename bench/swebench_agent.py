@@ -134,7 +134,7 @@ def main():
 
     ensure_repo_cache()
 
-    model_id = sys.argv[1] if len(sys.argv) > 1 else "qwen3.6-35b-a3b"
+    model_id = sys.argv[1] if len(sys.argv) > 1 else "devstral"
     model = next(m for m in load_models() if m["id"] == model_id)
     if not is_alive(model):
         print("modelo local no responde", file=sys.stderr)

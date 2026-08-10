@@ -9,9 +9,11 @@ from pathlib import Path
 
 import requests
 
-from common import load_models, is_alive
+from common import load_models, is_alive, parse_fallback_tool_calls
 from tools import VirtualFS, TOOL_SCHEMAS
 from agent_tasks import TASKS
+
+TOOL_NAMES = {t["function"]["name"] for t in TOOL_SCHEMAS}
 
 RESULTS = Path(__file__).parent.parent / "results"
 
@@ -43,14 +45,23 @@ def run_task(model, task):
         {"role": "user", "content": task["goal"]},
     ]
     turns = 0
+    used_fallback = False
     for turns in range(1, task["max_turns"] + 1):
         try:
             msg = call_with_tools(model, messages)
         except Exception as e:
             return {"id": task["id"], "passed": False, "turns": turns, "tool_calls": len(fs.calls),
-                    "tool_errors": sum(1 for c in fs.calls if not c[2]), "stop_reason": f"api_error: {e}"}
+                    "tool_errors": sum(1 for c in fs.calls if not c[2]), "stop_reason": f"api_error: {e}",
+                    "used_fallback_parser": used_fallback}
 
         tool_calls = msg.get("tool_calls")
+        if not tool_calls:
+            # algunas plantillas (GLM-4, Qwen2.5-Coder, DeepSeek-Coder-V2) no las
+            # parsea llama-server con --jinja y devuelve la llamada como texto
+            # crudo en content -- lo reconocemos ahi como fallback.
+            tool_calls = parse_fallback_tool_calls(msg.get("content"), TOOL_NAMES)
+            if tool_calls:
+                used_fallback = True
         if not tool_calls:
             break
 
@@ -64,11 +75,13 @@ def run_task(model, task):
             messages.append({"role": "tool", "tool_call_id": tc["id"], "content": result})
     else:
         return {"id": task["id"], "passed": False, "turns": turns, "tool_calls": len(fs.calls),
-                "tool_errors": sum(1 for c in fs.calls if not c[2]), "stop_reason": "max_turns"}
+                "tool_errors": sum(1 for c in fs.calls if not c[2]), "stop_reason": "max_turns",
+                "used_fallback_parser": used_fallback}
 
     passed = task["checker"](fs)
     return {"id": task["id"], "passed": passed, "turns": turns, "tool_calls": len(fs.calls),
-            "tool_errors": sum(1 for c in fs.calls if not c[2]), "stop_reason": "final_message"}
+            "tool_errors": sum(1 for c in fs.calls if not c[2]), "stop_reason": "final_message",
+            "used_fallback_parser": used_fallback}
 
 
 def main():
@@ -82,11 +95,13 @@ def main():
         passed = sum(o["passed"] for o in outcomes)
         avg_turns = sum(o["turns"] for o in outcomes) / len(outcomes)
         tool_errors = sum(o["tool_errors"] for o in outcomes)
+        fallback_used = sum(o.get("used_fallback_parser", False) for o in outcomes)
         results[model["id"]] = {
             "passed": passed, "total": len(TASKS), "avg_turns": round(avg_turns, 1),
-            "tool_errors": tool_errors, "detail": outcomes,
+            "tool_errors": tool_errors, "fallback_parser_used": fallback_used, "detail": outcomes,
         }
-        print(f"  {passed}/{len(TASKS)} pass, avg_turns={avg_turns:.1f}, tool_errors={tool_errors}", file=sys.stderr)
+        note = f" (fallback parser en {fallback_used}/{len(TASKS)})" if fallback_used else ""
+        print(f"  {passed}/{len(TASKS)} pass, avg_turns={avg_turns:.1f}, tool_errors={tool_errors}{note}", file=sys.stderr)
 
     with open(RESULTS / "agent_eval.json", "w") as f:
         json.dump(results, f, indent=2)

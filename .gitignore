@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.venv/
+.cache/
+logs/
+results/*.json
+results/*.md
+config/models.yaml

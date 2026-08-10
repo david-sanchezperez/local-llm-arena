@@ -1,0 +1,29 @@
+# Roster de modelos a evaluar. Copia este fichero a models.yaml y ajusta.
+# base_url debe ser un endpoint OpenAI-compatible (llama.cpp server, LiteLLM
+# proxy, o directamente la API de un proveedor). api_key/base_url admiten
+# variables de entorno (${MI_VAR}) para no versionar secretos.
+models:
+  - id: local-model
+    label: "Modelo local (ej. via llama.cpp + LiteLLM)"
+    base_url: http://localhost:4000/v1
+    api_key: ${LOCAL_LLM_API_KEY}
+    model_name: my-local-model
+    kind: local
+
+  - id: claude-sonnet-5
+    label: "Claude Sonnet 5 (API, frontier)"
+    base_url: https://api.anthropic.com/v1
+    api_key: ${ANTHROPIC_API_KEY}
+    model_name: claude-sonnet-5
+    kind: api
+
+  - id: deepseek-v4-flash
+    label: "DeepSeek V4 Flash (API, no-frontier, util como baseline barato)"
+    base_url: https://api.deepseek.com/v1
+    api_key: ${DEEPSEEK_API_KEY}
+    model_name: deepseek-v4-flash
+    kind: api
+
+# Modelos listados pero aun no disponibles/activos (el harness los salta
+# automaticamente si su endpoint no responde via is_alive()).
+pending: []

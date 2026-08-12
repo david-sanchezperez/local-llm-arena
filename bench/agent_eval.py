@@ -16,6 +16,7 @@ from agent_tasks import TASKS
 TOOL_NAMES = {t["function"]["name"] for t in TOOL_SCHEMAS}
 
 RESULTS = Path(__file__).parent.parent / "results"
+RESULTS.mkdir(exist_ok=True)
 
 SYSTEM = (
     "Eres un agente con acceso a un sistema de archivos via tools. Usa las tools "

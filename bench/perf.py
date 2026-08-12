@@ -62,7 +62,9 @@ def main():
         results.append(r)
         print(f"  ttft={r['ttft_s']}s  tok/s={r['tok_s']}  tokens={r['n_tokens']}", file=sys.stderr)
 
-    out = Path(__file__).parent.parent / "results" / "perf.json"
+    results_dir = Path(__file__).parent.parent / "results"
+    results_dir.mkdir(exist_ok=True)
+    out = results_dir / "perf.json"
     with open(out, "w") as f:
         json.dump(results, f, indent=2)
     print(f"guardado en {out}", file=sys.stderr)

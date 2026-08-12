@@ -15,6 +15,7 @@ import textwrap
 from pathlib import Path
 
 RESULTS = Path(__file__).parent.parent / "results"
+RESULTS.mkdir(exist_ok=True)
 
 from common import load_models, chat, is_alive, extract_code, load_hf_dataset
 

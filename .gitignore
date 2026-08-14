@@ -5,4 +5,5 @@ __pycache__/
 logs/
 results/*.json
 results/*.md
+results/candidates/
 config/models.yaml

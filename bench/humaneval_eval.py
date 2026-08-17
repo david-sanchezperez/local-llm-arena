@@ -7,11 +7,13 @@ ponytail: exec() sin sandbox, igual que code_eval.py — mismo trust boundary
 """
 import argparse
 import json
+import os
 import random
 import subprocess
 import sys
 import tempfile
 import textwrap
+import time
 from pathlib import Path
 
 RESULTS = Path(__file__).parent.parent / "results"
@@ -21,6 +23,7 @@ from common import load_models, chat, is_alive, extract_code, load_hf_dataset
 
 SEED = 42
 TIMEOUT_S = 10
+PAUSE_S = float(os.environ.get("BENCH_PAUSE_S", "0"))  # ponytail: duty-cycle guard para GPUs locales en carga sostenida
 
 
 def run_problem(model, problem):
@@ -66,7 +69,11 @@ def main():
             print(f"[skip] {model['id']}: no responde", file=sys.stderr)
             continue
         print(f"[run] {model['id']}...", file=sys.stderr)
-        outcomes = [run_problem(model, p) for p in problems]
+        outcomes = []
+        for p in problems:
+            outcomes.append(run_problem(model, p))
+            if PAUSE_S:
+                time.sleep(PAUSE_S)
         passed = sum(o["passed"] for o in outcomes)
         results[model["id"]] = {"passed": passed, "total": len(problems), "detail": outcomes}
         print(f"  {passed}/{len(problems)} pass@1", file=sys.stderr)

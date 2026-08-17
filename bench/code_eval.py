@@ -6,11 +6,15 @@ modelos de confianza en tu propia maquina; si algun dia evaluas output no
 confiable, mete un contenedor. No hace falta hoy.
 """
 import json
+import os
 import subprocess
 import sys
 import tempfile
 import textwrap
+import time
 from pathlib import Path
+
+PAUSE_S = float(os.environ.get("BENCH_PAUSE_S", "0"))  # ponytail: duty-cycle guard para GPUs locales en carga sostenida
 
 RESULTS = Path(__file__).parent.parent / "results"
 RESULTS.mkdir(exist_ok=True)
@@ -55,7 +59,11 @@ def main():
             print(f"[skip] {model['id']}: no responde", file=sys.stderr)
             continue
         print(f"[run] {model['id']}...", file=sys.stderr)
-        outcomes = [run_problem(model, p) for p in PROBLEMS]
+        outcomes = []
+        for p in PROBLEMS:
+            outcomes.append(run_problem(model, p))
+            if PAUSE_S:
+                time.sleep(PAUSE_S)
         passed = sum(o["passed"] for o in outcomes)
         results[model["id"]] = {"passed": passed, "total": len(PROBLEMS), "detail": outcomes}
         print(f"  {passed}/{len(PROBLEMS)} pass", file=sys.stderr)

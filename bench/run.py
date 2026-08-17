@@ -54,6 +54,12 @@ SUITES = {
         "official": True,
         "needs": "pip install -r requirements-official.txt",
     },
+    "terminal-bench": {
+        "script": "terminal_bench_eval.py",
+        "categories": ["dev", "agentic", "long"],
+        "official": True,
+        "needs": "pip install terminal-bench (CLI 'tb'), Docker corriendo",
+    },
 }
 
 

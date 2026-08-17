@@ -4,7 +4,9 @@ sandbox con estado (tools.py), nosotros ejecutamos y devolvemos el resultado, ha
 que el modelo termina o se agota max_turns. Se mide: pass/fail, turnos usados, nº de
 tool calls, nº de tool calls fallidas (json invalido / tool inexistente / excepcion)."""
 import json
+import os
 import sys
+import time
 from pathlib import Path
 
 import requests
@@ -14,6 +16,7 @@ from tools import VirtualFS, TOOL_SCHEMAS
 from agent_tasks import TASKS
 
 TOOL_NAMES = {t["function"]["name"] for t in TOOL_SCHEMAS}
+PAUSE_S = float(os.environ.get("BENCH_PAUSE_S", "0"))  # ponytail: duty-cycle guard para GPUs locales en carga sostenida
 
 RESULTS = Path(__file__).parent.parent / "results"
 RESULTS.mkdir(exist_ok=True)
@@ -92,7 +95,11 @@ def main():
             print(f"[skip] {model['id']}: no responde", file=sys.stderr)
             continue
         print(f"[run] {model['id']}...", file=sys.stderr)
-        outcomes = [run_task(model, t) for t in TASKS]
+        outcomes = []
+        for t in TASKS:
+            outcomes.append(run_task(model, t))
+            if PAUSE_S:
+                time.sleep(PAUSE_S)
         passed = sum(o["passed"] for o in outcomes)
         avg_turns = sum(o["turns"] for o in outcomes) / len(outcomes)
         tool_errors = sum(o["tool_errors"] for o in outcomes)

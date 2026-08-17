@@ -31,6 +31,10 @@ python3 gsm8k_eval.py --n 300         # cada bateria oficial admite --n para ele
 # SWE-bench Lite (bateria oficial mas pesada, solo modelos locales, venv aparte):
 cd .. && python3 -m venv .venv && .venv/bin/pip install swebench datasets pyyaml requests
 .venv/bin/python bench/swebench_agent.py <model_id>
+
+# Terminal-Bench (codificacion agentica real en terminal, Docker, CLI oficial):
+pip install terminal-bench
+cd bench && python3 terminal_bench_eval.py --n-tasks 10
 ```
 
 Roster de modelos en `config/models.yaml` (no se versiona — usa
@@ -49,6 +53,7 @@ responde (`is_alive`).
 | `gsm8k` | `gsm8k_eval.py` | reasoning, short | **oficial** | GSM8K real (razonamiento matemático), submuestra de 100 por defecto (`--n`) |
 | `mmlu` | `mmlu_eval.py` | knowledge, short | **oficial** | MMLU real (57 materias, opción múltiple), submuestra de 200 por defecto (`--n`) |
 | `swebench` | `swebench_agent.py` | dev, agentic, long | **oficial** | SWE-bench Lite real (Docker, harness oficial `swebench`) |
+| `terminal-bench` | `terminal_bench_eval.py` | dev, agentic, long | **oficial** | Terminal-Bench real (Docker, CLI oficial `tb`), codificación agéntica en terminal — submuestra de 10 tareas por defecto (`--n-tasks`) |
 
 "oficial" = benchmark público/estándar con dataset real (vía HF `datasets`),
 comparable con resultados de otros proyectos (útil al liberar un modelo o
